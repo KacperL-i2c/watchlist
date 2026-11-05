@@ -4,43 +4,78 @@
   <meta charset="UTF-8">
   <title>Watchlista</title>
   <style>
-    body { font-family: monospace; padding: 20px; max-width: 600px; margin: auto; }
-    input, button { padding: 6px 10px; margin: 4px 0; font-family: inherit; }
+    body { font-family: monospace; padding: 20px; max-width: 750px; margin: auto; }
+    input, button, select { padding: 6px 10px; margin: 4px 2px; font-family: inherit; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+    th, td { border: 1px solid #aaa; padding: 8px; text-align: left; vertical-align: middle; }
+    th { background: #f4f4f4; }
     .hidden { display: none; }
     .auth-box { border: 1px solid #ccc; padding: 15px; border-radius: 4px; }
     .error { color: red; font-size: 12px; }
+    .watched-row { opacity: 0.6; }
+    .filters-bar { display: flex; gap: 8px; margin-top: 15px; align-items: center; }
   </style>
 </head>
 <body>
 
-  <!-- 1. SEKCJA LOGOWANIA / REJESTRACJI -->
+  <!-- 1. SEKCJA LOGOWANIA -->
   <div id="auth-section" class="auth-box">
     <h3>Logowanie</h3>
     <input type="email" id="emailInput" placeholder="Twój e-mail"><br>
     <input type="password" id="passInput" placeholder="Hasło (min. 6 znaków)"><br>
     <button id="btnLogin">Zaloguj</button>
-    <button id="btnRegister">Zarejestruj nowe konto</button>
+    <button id="btnRegister">Zarejestruj</button>
     <div id="authError" class="error"></div>
   </div>
 
-  <!-- 2. SEKCJA GŁÓWNA (po zalogowaniu) -->
+  <!-- 2. SEKCJA GŁÓWNA -->
   <div id="app-section" class="hidden">
     <p>Zalogowano: <b id="userEmail"></b> <button id="btnLogout">Wyloguj</button></p>
 
+    <!-- FORMULARZ DODAWANIA -->
     <form id="addForm">
-      <input type="text" id="titleInput" placeholder="Tytuł..." required>
+      <input type="text" id="titleInput" placeholder="Tytuł..." required style="width: 220px;">
+
+      <select id="ratingInput">
+        <option value="">Ocena (-)</option>
+        <option value="10">10 / 10</option>
+        <option value="9">9 / 10</option>
+        <option value="8">8 / 10</option>
+        <option value="7">7 / 10</option>
+        <option value="6">6 / 10</option>
+        <option value="5">5 / 10</option>
+        <option value="4">4 / 10</option>
+        <option value="3">3 / 10</option>
+        <option value="2">2 / 10</option>
+        <option value="1">1 / 10</option>
+      </select>
+
+      <label style="margin: 0 8px;">
+        <input type="checkbox" id="watchedInput"> Obejrzane
+      </label>
+
       <button type="submit">Dodaj</button>
     </form>
 
-    <br>
-    <input type="text" id="searchInput" placeholder="Szukaj w tabeli...">
+    <!-- PASEK WYSZUKIWANIA I SORTOWANIA -->
+    <div class="filters-bar">
+      <input type="text" id="searchInput" placeholder="Szukaj po tytule..." style="flex: 1;">
 
+      <select id="viewFilter">
+        <option value="all">Wszystkie (Nieobejrzane na górze)</option>
+        <option value="unwatched">Tylko nieobejrzane</option>
+        <option value="watched">Tylko obejrzane</option>
+        <option value="rating_desc">Najwyższa ocena najpierw</option>
+      </select>
+    </div>
+
+    <!-- TABELA -->
     <table>
       <thead>
         <tr>
+          <th style="width: 30px;">Obejrzane</th>
           <th>Tytuł</th>
+          <th style="width: 80px;">Ocena</th>
           <th style="width: 60px;">Akcja</th>
         </tr>
       </thead>
@@ -62,19 +97,12 @@
       collection,
       addDoc,
       deleteDoc,
+      updateDoc,
       doc,
       onSnapshot
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // TWOJA KONFIGURACJA Z KONSOLI:
-    const firebaseConfig = {
-      apiKey: "AIzaSyAi84JAM0e1M7muvpq4CcJJA7NahEhwEVE",
-      authDomain: "watchlist-bfe31.firebaseapp.com",
-      projectId: "watchlist-bfe31",
-      storageBucket: "watchlist-bfe31.firebasestorage.app",
-      messagingSenderId: "586950061109",
-      appId: "1:586950061109:web:578da030d6b52586ab957c"
-    };
+    const firebaseConfig = {       apiKey: "AIzaSyAi84JAM0e1M7muvpq4CcJJA7NahEhwEVE",       authDomain: "watchlist-bfe31.firebaseapp.com",       projectId: "watchlist-bfe31",       storageBucket: "watchlist-bfe31.firebasestorage.app",       messagingSenderId: "586950061109",       appId: "1:586950061109:web:578da030d6b52586ab957c"     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -92,8 +120,10 @@
     const authError = document.getElementById("authError");
     const emailInput = document.getElementById("emailInput");
     const passInput = document.getElementById("passInput");
+    const searchInput = document.getElementById("searchInput");
+    const viewFilter = document.getElementById("viewFilter");
 
-    // LOGOWANIE
+    // AUTH
     document.getElementById("btnLogin").onclick = async () => {
       authError.textContent = "";
       try {
@@ -103,7 +133,6 @@
       }
     };
 
-    // REJESTRACJA (klikasz raz, żeby stworzyć swoje konto)
     document.getElementById("btnRegister").onclick = async () => {
       authError.textContent = "";
       try {
@@ -113,10 +142,8 @@
       }
     };
 
-    // WYLOGOWANIE
     document.getElementById("btnLogout").onclick = () => signOut(auth);
 
-    // OBSŁUGA STANU SESJI
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
       if (user) {
@@ -132,24 +159,70 @@
       }
     });
 
-    // POBIERANIE DANYCH (watchlist/{uid}/items)
+    // POBIERANIE DANYCH
     function subskrybujDane(uid) {
       const itemsRef = collection(db, "watchlist", uid, "items");
       unsubscribeFirestore = onSnapshot(itemsRef, (snapshot) => {
         allItems = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderTable(allItems);
+        przeliczIWyswietl();
       });
     }
 
-    // RENDER TABELI
+    // LOGIKA FILTROWANIA I SORTOWANIA
+    function przeliczIWyswietl() {
+      const query = searchInput.value.toLowerCase().trim();
+      const filterMode = viewFilter.value;
+
+      let result = allItems.filter(item =>
+        (item.title || "").toLowerCase().includes(query)
+      );
+
+      if (filterMode === "unwatched") {
+        result = result.filter(item => !item.watched);
+      } else if (filterMode === "watched") {
+        result = result.filter(item => item.watched);
+      } else if (filterMode === "rating_desc") {
+        result.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+      } else {
+        // Domyślnie ("all"): Nieobejrzane na górze, obejrzane na dole
+        result.sort((a, b) => (a.watched === b.watched ? 0 : a.watched ? 1 : -1));
+      }
+
+      renderTable(result);
+    }
+
+    // RENDEROWANIE TABELI
     function renderTable(items) {
+      if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">Brak pozycji do wyświetlenia</td></tr>`;
+        return;
+      }
+
       tbody.innerHTML = items.map(item => `
-        <tr>
+        <tr class="${item.watched ? 'watched-row' : ''}">
+          <td style="text-align: center;">
+            <input type="checkbox" class="toggle-watched" data-id="${item.id}" ${item.watched ? 'checked' : ''}>
+          </td>
           <td>${item.title}</td>
-          <td><button data-id="${item.id}" class="btn-del">Usuń</button></td>
+          <td>${item.rating ? `${item.rating}/10` : '-'}</td>
+          <td>
+            <button data-id="${item.id}" class="btn-del">Usuń</button>
+          </td>
         </tr>
       `).join("");
 
+      // Zmiana statusu checkboxem (natychmiastowy update w Firestore)
+      document.querySelectorAll(".toggle-watched").forEach(cb => {
+        cb.onchange = (e) => {
+          const docId = cb.getAttribute("data-id");
+          const isWatched = e.target.checked;
+          updateDoc(doc(db, "watchlist", currentUser.uid, "items", docId), {
+            watched: isWatched
+          });
+        };
+      });
+
+      // Usuwanie
       document.querySelectorAll(".btn-del").forEach(btn => {
         btn.onclick = () => {
           const docId = btn.getAttribute("data-id");
@@ -161,18 +234,24 @@
     // DODAWANIE WPISU
     document.getElementById("addForm").onsubmit = async (e) => {
       e.preventDefault();
-      const input = document.getElementById("titleInput");
+      const titleEl = document.getElementById("titleInput");
+      const ratingEl = document.getElementById("ratingInput");
+      const watchedEl = document.getElementById("watchedInput");
+
       await addDoc(collection(db, "watchlist", currentUser.uid, "items"), {
-        title: input.value
+        title: titleEl.value.trim(),
+        rating: ratingEl.value ? Number(ratingEl.value) : null,
+        watched: watchedEl.checked
       });
-      input.value = "";
+
+      titleEl.value = "";
+      ratingEl.value = "";
+      watchedEl.checked = false;
     };
 
-    // FILTROWANIE
-    document.getElementById("searchInput").oninput = (e) => {
-      const q = e.target.value.toLowerCase();
-      renderTable(allItems.filter(i => i.title.toLowerCase().includes(q)));
-    };
+    // EVENTY WYSZUKIWARKI I FILTRA
+    searchInput.oninput = przeliczIWyswietl;
+    viewFilter.onchange = przeliczIWyswietl;
   </script>
 </body>
 </html>
