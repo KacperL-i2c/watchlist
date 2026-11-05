@@ -1,10 +1,150 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Kacper-i2c Watchlist</title>
-  </head>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Moja Watchlista</title>
+  <style>
+    body { font-family: monospace; padding: 20px; max-width: 600px; margin: auto; }
+    input, button { padding: 6px 10px; margin: 4px 0; font-family: inherit; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
 
-  <body>
-    <p1>TODO</p1>
-  </body>
+  <!-- 1. Sekcja logowania -->
+  <div id="auth-section">
+    <button id="btnLogin">Zaloguj przez Google</button>
+  </div>
+
+  <!-- 2. Sekcja aplikacji (ukryta przed zalogowaniem) -->
+  <div id="app-section" class="hidden">
+    <p>Zalogowano jako: <b id="userEmail"></b> <button id="btnLogout">Wyloguj</button></p>
+
+    <form id="addForm">
+      <input type="text" id="titleInput" placeholder="Tytuł filmu..." required>
+      <button type="submit">Dodaj</button>
+    </form>
+
+    <br>
+    <input type="text" id="searchInput" placeholder="Filtruj listę...">
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tytuł</th>
+          <th style="width: 60px;">Akcja</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 3. Skrypt Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // WKLEJ SWOJE DANE Z KONSOLI FIREBASE:
+    const firebaseConfig = {
+      apiKey: "AIzaSyAi84JAM0e1M7muvpq4CcJJA7NahEhwEVE",
+      authDomain: "watchlist-bfe31.firebaseapp.com",
+      projectId: "watchlist-bfe31",
+      storageBucket: "watchlist-bfe31.firebasestorage.app",
+      messagingSenderId: "586950061109",
+      appId: "1:586950061109:web:578da030d6b52586ab957c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let allItems = [];
+    let unsubscribeFirestore = null;
+
+    // Elementy DOM
+    const authSec = document.getElementById("auth-section");
+    const appSec = document.getElementById("app-section");
+    const userEmailSpan = document.getElementById("userEmail");
+    const tbody = document.getElementById("tableBody");
+    const searchInput = document.getElementById("searchInput");
+
+    // --- AUTORYZACJA ---
+    document.getElementById("btnLogin").onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
+    document.getElementById("btnLogout").onclick = () => signOut(auth);
+
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      if (user) {
+        authSec.classList.add("hidden");
+        appSec.classList.remove("hidden");
+        userEmailSpan.textContent = user.email;
+        subskrybujDane(user.uid);
+      } else {
+        authSec.classList.remove("hidden");
+        appSec.classList.add("hidden");
+        tbody.innerHTML = "";
+        if (unsubscribeFirestore) unsubscribeFirestore();
+      }
+    });
+
+    // --- ODCZYT (Ścieżka: watchlist/{uid}/items) ---
+    function subskrybujDane(uid) {
+      const itemsRef = collection(db, "watchlist", uid, "items");
+      
+      // onSnapshot nasłuchuje zmian na bieżąco
+      unsubscribeFirestore = onSnapshot(itemsRef, (snapshot) => {
+        allItems = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderTable(allItems);
+      });
+    }
+
+    // --- RENDEROWANIE TABELI ---
+    function renderTable(items) {
+      tbody.innerHTML = items.map(item => `
+        <tr>
+          <td>${item.title}</td>
+          <td><button data-id="${item.id}" class="btn-del">Usuń</button></td>
+        </tr>
+      `).join("");
+
+      // Podpięcie usuwania pod wygenerowane przyciski
+      document.querySelectorAll(".btn-del").forEach(btn => {
+        btn.onclick = () => {
+          const docId = btn.getAttribute("data-id");
+          deleteDoc(doc(db, "watchlist", currentUser.uid, "items", docId));
+        };
+      });
+    }
+
+    // --- ZAPIS (DODAWANIE) ---
+    document.getElementById("addForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("titleInput");
+      await addDoc(collection(db, "watchlist", currentUser.uid, "items"), {
+        title: input.value
+      });
+      input.value = "";
+    };
+
+    // --- FILTROWANIE ---
+    searchInput.oninput = (e) => {
+      const query = e.target.value.toLowerCase();
+      const filtered = allItems.filter(item => item.title.toLowerCase().includes(query));
+      renderTable(filtered);
+    };
+  </script>
+</body>
 </html>
+
+
+
+
+
+
+
+
+
