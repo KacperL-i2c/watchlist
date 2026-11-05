@@ -2,33 +2,40 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <title>Moja Watchlista</title>
+  <title>Watchlista</title>
   <style>
     body { font-family: monospace; padding: 20px; max-width: 600px; margin: auto; }
     input, button { padding: 6px 10px; margin: 4px 0; font-family: inherit; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
     .hidden { display: none; }
+    .auth-box { border: 1px solid #ccc; padding: 15px; border-radius: 4px; }
+    .error { color: red; font-size: 12px; }
   </style>
 </head>
 <body>
 
-  <!-- 1. Sekcja logowania -->
-  <div id="auth-section">
-    <button id="btnLogin">Zaloguj przez Google</button>
+  <!-- 1. SEKCJA LOGOWANIA / REJESTRACJI -->
+  <div id="auth-section" class="auth-box">
+    <h3>Logowanie</h3>
+    <input type="email" id="emailInput" placeholder="Twój e-mail"><br>
+    <input type="password" id="passInput" placeholder="Hasło (min. 6 znaków)"><br>
+    <button id="btnLogin">Zaloguj</button>
+    <button id="btnRegister">Zarejestruj nowe konto</button>
+    <div id="authError" class="error"></div>
   </div>
 
-  <!-- 2. Sekcja aplikacji (ukryta przed zalogowaniem) -->
+  <!-- 2. SEKCJA GŁÓWNA (po zalogowaniu) -->
   <div id="app-section" class="hidden">
-    <p>Zalogowano jako: <b id="userEmail"></b> <button id="btnLogout">Wyloguj</button></p>
+    <p>Zalogowano: <b id="userEmail"></b> <button id="btnLogout">Wyloguj</button></p>
 
     <form id="addForm">
-      <input type="text" id="titleInput" placeholder="Tytuł filmu..." required>
+      <input type="text" id="titleInput" placeholder="Tytuł..." required>
       <button type="submit">Dodaj</button>
     </form>
 
     <br>
-    <input type="text" id="searchInput" placeholder="Filtruj listę...">
+    <input type="text" id="searchInput" placeholder="Szukaj w tabeli...">
 
     <table>
       <thead>
@@ -41,13 +48,25 @@
     </table>
   </div>
 
-  <!-- 3. Skrypt Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      deleteDoc,
+      doc,
+      onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // WKLEJ SWOJE DANE Z KONSOLI FIREBASE:
+    // TWOJA KONFIGURACJA Z KONSOLI:
     const firebaseConfig = {
       apiKey: "AIzaSyAi84JAM0e1M7muvpq4CcJJA7NahEhwEVE",
       authDomain: "watchlist-bfe31.firebaseapp.com",
@@ -65,17 +84,39 @@
     let allItems = [];
     let unsubscribeFirestore = null;
 
-    // Elementy DOM
+    // DOM
     const authSec = document.getElementById("auth-section");
     const appSec = document.getElementById("app-section");
     const userEmailSpan = document.getElementById("userEmail");
     const tbody = document.getElementById("tableBody");
-    const searchInput = document.getElementById("searchInput");
+    const authError = document.getElementById("authError");
+    const emailInput = document.getElementById("emailInput");
+    const passInput = document.getElementById("passInput");
 
-    // --- AUTORYZACJA ---
-    document.getElementById("btnLogin").onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
+    // LOGOWANIE
+    document.getElementById("btnLogin").onclick = async () => {
+      authError.textContent = "";
+      try {
+        await signInWithEmailAndPassword(auth, emailInput.value, passInput.value);
+      } catch (err) {
+        authError.textContent = err.message;
+      }
+    };
+
+    // REJESTRACJA (klikasz raz, żeby stworzyć swoje konto)
+    document.getElementById("btnRegister").onclick = async () => {
+      authError.textContent = "";
+      try {
+        await createUserWithEmailAndPassword(auth, emailInput.value, passInput.value);
+      } catch (err) {
+        authError.textContent = err.message;
+      }
+    };
+
+    // WYLOGOWANIE
     document.getElementById("btnLogout").onclick = () => signOut(auth);
 
+    // OBSŁUGA STANU SESJI
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
       if (user) {
@@ -91,18 +132,16 @@
       }
     });
 
-    // --- ODCZYT (Ścieżka: watchlist/{uid}/items) ---
+    // POBIERANIE DANYCH (watchlist/{uid}/items)
     function subskrybujDane(uid) {
       const itemsRef = collection(db, "watchlist", uid, "items");
-      
-      // onSnapshot nasłuchuje zmian na bieżąco
       unsubscribeFirestore = onSnapshot(itemsRef, (snapshot) => {
         allItems = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         renderTable(allItems);
       });
     }
 
-    // --- RENDEROWANIE TABELI ---
+    // RENDER TABELI
     function renderTable(items) {
       tbody.innerHTML = items.map(item => `
         <tr>
@@ -111,7 +150,6 @@
         </tr>
       `).join("");
 
-      // Podpięcie usuwania pod wygenerowane przyciski
       document.querySelectorAll(".btn-del").forEach(btn => {
         btn.onclick = () => {
           const docId = btn.getAttribute("data-id");
@@ -120,7 +158,7 @@
       });
     }
 
-    // --- ZAPIS (DODAWANIE) ---
+    // DODAWANIE WPISU
     document.getElementById("addForm").onsubmit = async (e) => {
       e.preventDefault();
       const input = document.getElementById("titleInput");
@@ -130,21 +168,11 @@
       input.value = "";
     };
 
-    // --- FILTROWANIE ---
-    searchInput.oninput = (e) => {
-      const query = e.target.value.toLowerCase();
-      const filtered = allItems.filter(item => item.title.toLowerCase().includes(query));
-      renderTable(filtered);
+    // FILTROWANIE
+    document.getElementById("searchInput").oninput = (e) => {
+      const q = e.target.value.toLowerCase();
+      renderTable(allItems.filter(i => i.title.toLowerCase().includes(q)));
     };
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
