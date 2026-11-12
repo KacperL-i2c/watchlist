@@ -14,9 +14,39 @@
     .error { color: red; font-size: 12px; }
     .watched-row { opacity: 0.6; }
     .filters-bar { display: flex; gap: 8px; margin-top: 15px; align-items: center; }
+    textarea { font-family: inherit; padding: 6px; width: 100%; box-sizing: border-box; resize: vertical; }
+    .detail-box { border: 1px solid #ccc; padding: 15px; border-radius: 4px; }
+    .back-link { display: inline-block; margin-bottom: 10px; }
+    .detail-meta { color: #888; font-size: 12px; }
+    .saved-status { color: green; font-size: 12px; margin-left: 8px; }
+    .title-meta { color: #888; font-size: 11px; }
+    .poster { border: 1px solid #ccc; }
+    .star { cursor: pointer; color: #e2a400; }
+    .star.off { color: #b0b0b0; }
+    .stars-box { font-size: 22px; }
+    .tytul-wrap { position: relative; display: inline-block; }
+    .suggestions { position: absolute; left: 0; right: 0; background: #fff; border: 1px solid #aaa; z-index: 10; }
+    .suggestion { padding: 6px 10px; cursor: pointer; }
+    .suggestion:hover { background: #f4f4f4; }
+
+    /* TRYB CIEMNY */
+    body.dark { background: #1b1b1b; color: #ddd; }
+    body.dark a { color: #9cc3ff; }
+    body.dark th { background: #262626; }
+    body.dark th, body.dark td { border-color: #4a4a4a; }
+    body.dark input, body.dark select, body.dark button, body.dark textarea { background: #242424; color: #ddd; border: 1px solid #565656; }
+    body.dark .auth-box, body.dark .detail-box { border-color: #565656; }
+    body.dark .suggestions { background: #242424; border-color: #565656; }
+    body.dark .suggestion:hover { background: #333; }
+    body.dark .title-meta, body.dark .detail-meta { color: #999; }
+    body.dark .poster { border-color: #565656; }
+    body.dark .star.off { color: #6e6e6e; }
   </style>
 </head>
 <body>
+
+  <!-- 0. PRZYCISK MOTYWU -->
+  <button id="btnTheme" title="Zmień motyw" style="position: fixed; top: 12px; right: 12px;">☾</button>
 
   <!-- 1. SEKCJA LOGOWANIA -->
   <div id="auth-section" class="auth-box">
@@ -34,21 +64,18 @@
 
     <!-- FORMULARZ DODAWANIA -->
     <form id="addForm">
-      <input type="text" id="titleInput" placeholder="Tytuł..." required style="width: 220px;">
+      <span class="tytul-wrap">
+        <input type="text" id="titleInput" placeholder="Tytuł..." required style="width: 220px;" autocomplete="off">
+        <div id="suggestions" class="suggestions hidden"></div>
+      </span>
 
-      <select id="ratingInput">
-        <option value="">Ocena (-)</option>
-        <option value="10">10 / 10</option>
-        <option value="9">9 / 10</option>
-        <option value="8">8 / 10</option>
-        <option value="7">7 / 10</option>
-        <option value="6">6 / 10</option>
-        <option value="5">5 / 10</option>
-        <option value="4">4 / 10</option>
-        <option value="3">3 / 10</option>
-        <option value="2">2 / 10</option>
-        <option value="1">1 / 10</option>
+      <select id="typeInput">
+        <option value="">Typ (-)</option>
+        <option value="movie">Film</option>
+        <option value="tv">Serial</option>
       </select>
+
+      Ocena: <span id="ratingStars"></span>
 
       <label style="margin: 0 8px;">
         <input type="checkbox" id="watchedInput"> Obejrzane
@@ -65,8 +92,17 @@
         <option value="all">Wszystkie (Nieobejrzane na górze)</option>
         <option value="unwatched">Tylko nieobejrzane</option>
         <option value="watched">Tylko obejrzane</option>
+        <option value="movies">Tylko filmy</option>
+        <option value="tv">Tylko seriale</option>
         <option value="rating_desc">Najwyższa ocena najpierw</option>
       </select>
+    </div>
+
+    <!-- EKSPORT I IMPORT CSV -->
+    <div class="filters-bar">
+      <button id="btnExport">Eksportuj CSV</button>
+      <button id="btnImport">Importuj CSV</button>
+      <input type="file" id="csvFile" accept=".csv" class="hidden">
     </div>
 
     <!-- TABELA -->
@@ -75,12 +111,38 @@
         <tr>
           <th style="width: 30px;">Obejrzane</th>
           <th>Tytuł</th>
-          <th style="width: 80px;">Ocena</th>
+          <th style="width: 100px;">Ocena</th>
           <th style="width: 60px;">Akcja</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
+  </div>
+
+  <!-- 3. STRONA TYTUŁU -->
+  <div id="detail-section" class="hidden">
+    <a href="#/" class="back-link">&larr; Wróć do listy</a>
+    <div class="detail-box">
+      <img id="detailPoster" class="poster hidden" alt="" style="float: right; max-width: 180px; margin: 0 0 10px 15px;">
+      <h2 id="detailTitle" style="margin-top: 0;"></h2>
+      <div id="detailMetaLine" class="title-meta"></div>
+
+      <p>
+        <label style="margin: 0 8px;">
+          <input type="checkbox" id="detailWatched"> Obejrzane
+        </label>
+
+        Ocena: <span id="detailStars" class="stars-box"></span>
+      </p>
+
+      <h3>Opis</h3>
+      <textarea id="descInput" rows="7" placeholder="Twój opis, przemyślenia, notatki..."></textarea><br>
+      <button id="btnSaveDesc">Zapisz opis</button>
+      <span id="saveStatus" class="saved-status"></span>
+
+      <p id="detailMeta" class="detail-meta"></p>
+      <p><a id="detailMal" class="hidden" href="#" target="_blank" rel="noopener">Otwórz na MyAnimeList ↗</a></p>
+    </div>
   </div>
 
   <script type="module">
@@ -99,6 +161,8 @@
       deleteDoc,
       updateDoc,
       doc,
+      serverTimestamp,
+      Timestamp,
       onSnapshot
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -108,9 +172,18 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // BAZA ANIME: ANILIST (https://anilist.co) - bez klucza i bez rejestracji
+    // Dane zawierają też ID MyAnimeList, więc linki do MAL działają jak dotychczas.
+    const ANILIST_API = "https://graphql.anilist.co";
+
     let currentUser = null;
     let allItems = [];
     let unsubscribeFirestore = null;
+    let currentDetailId = null;
+    let nowaOcena = null;        // ocena wybierana gwiazdkami w formularzu dodawania
+    let wynikiAnime = [];        // ostatnie wyniki wyszukiwania w bazie anime
+    let wybranyAnime = null;     // pozycja wybrana z podpowiedzi
+    let licznikSzukania = null;  // opóźnienie wyszukiwania (debounce)
 
     // DOM
     const authSec = document.getElementById("auth-section");
@@ -122,6 +195,32 @@
     const passInput = document.getElementById("passInput");
     const searchInput = document.getElementById("searchInput");
     const viewFilter = document.getElementById("viewFilter");
+    const typeInput = document.getElementById("typeInput");
+    const ratingStars = document.getElementById("ratingStars");
+    const suggestions = document.getElementById("suggestions");
+    const btnTheme = document.getElementById("btnTheme");
+    const csvFile = document.getElementById("csvFile");
+    const detailSec = document.getElementById("detail-section");
+    const detailPoster = document.getElementById("detailPoster");
+    const detailTitle = document.getElementById("detailTitle");
+    const detailMetaLine = document.getElementById("detailMetaLine");
+    const detailWatched = document.getElementById("detailWatched");
+    const detailStars = document.getElementById("detailStars");
+    const descInput = document.getElementById("descInput");
+    const saveStatus = document.getElementById("saveStatus");
+    const detailMeta = document.getElementById("detailMeta");
+    const detailMal = document.getElementById("detailMal");
+
+    // TRYB CIEMNY (wybór zapamiętywany w localStorage)
+    if (localStorage.getItem("motyw") === "ciemny") {
+      document.body.classList.add("dark");
+      btnTheme.textContent = "☀";
+    }
+    btnTheme.onclick = () => {
+      const ciemny = document.body.classList.toggle("dark");
+      localStorage.setItem("motyw", ciemny ? "ciemny" : "jasny");
+      btnTheme.textContent = ciemny ? "☀" : "☾";
+    };
 
     // AUTH
     document.getElementById("btnLogin").onclick = async () => {
@@ -151,9 +250,12 @@
         appSec.classList.remove("hidden");
         userEmailSpan.textContent = user.email;
         subskrybujDane(user.uid);
+        sprawdzTrase();
       } else {
         authSec.classList.remove("hidden");
         appSec.classList.add("hidden");
+        detailSec.classList.add("hidden");
+        currentDetailId = null;
         tbody.innerHTML = "";
         if (unsubscribeFirestore) unsubscribeFirestore();
       }
@@ -165,8 +267,232 @@
       unsubscribeFirestore = onSnapshot(itemsRef, (snapshot) => {
         allItems = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         przeliczIWyswietl();
+        sprawdzTrase();
       });
     }
+
+    // ROUTING - PODSTRONA TYTUŁU (odnośnik w formacie #/film/ID)
+    window.onhashchange = sprawdzTrase;
+
+    function sprawdzTrase() {
+      const match = location.hash.match(/^#\/film\/(.+)$/);
+      if (currentUser && match) {
+        pokazSzczegoly(decodeURIComponent(match[1]));
+      } else {
+        currentDetailId = null;
+        detailSec.classList.add("hidden");
+        if (currentUser) appSec.classList.remove("hidden");
+      }
+    }
+
+    function pokazSzczegoly(id) {
+      const item = allItems.find(i => i.id === id);
+      if (!item) {
+        // Brak takiego tytułu (np. został usunięty) - wracamy do listy
+        location.hash = "#/";
+        return;
+      }
+
+      currentDetailId = id;
+      appSec.classList.add("hidden");
+      detailSec.classList.remove("hidden");
+
+      detailTitle.textContent = item.title;
+      detailMetaLine.textContent = liniaMeta(item);
+      detailMetaLine.classList.toggle("hidden", !liniaMeta(item));
+
+      if (item.posterPath) {
+        detailPoster.src = item.posterLarge || item.posterPath;
+        detailPoster.classList.remove("hidden");
+      } else {
+        detailPoster.classList.add("hidden");
+      }
+
+      if (item.malUrl) {
+        detailMal.href = item.malUrl;
+        detailMal.textContent = item.malUrl.includes("myanimelist")
+          ? "Otwórz na MyAnimeList ↗"
+          : "Otwórz na AniList ↗";
+        detailMal.classList.remove("hidden");
+      } else {
+        detailMal.classList.add("hidden");
+      }
+
+      detailWatched.checked = !!item.watched;
+      rysujOceneSzczegolow();
+
+      // Nie nadpisujemy pola, gdy użytkownik właśnie w nim pisze
+      if (document.activeElement !== descInput) {
+        descInput.value = item.description || "";
+      }
+
+      detailMeta.textContent = (item.score ? "Ocena bazy: " + item.score + " / 100 · " : "") +
+        "Dodano: " + (item.createdAt && item.createdAt.toMillis
+        ? new Date(item.createdAt.toMillis()).toLocaleString("pl-PL")
+        : "—");
+    }
+
+    // ESCAPE TEKSTU PRZED WSTAWIENIEM DO HTML
+    function esc(tekst) {
+      return String(tekst ?? "").replace(/[&<>"']/g, znak =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[znak])
+      );
+    }
+
+    // LINIA METADANYCH POD TYTUŁEM (rok · typ · gatunki)
+    function liniaMeta(item) {
+      const czesci = [];
+      if (item.year) czesci.push(item.year);
+      if (item.type) czesci.push(item.type === "tv" ? "serial" : "film");
+      if (item.episodes) czesci.push("odc. " + item.episodes);
+      if (item.genres && item.genres.length) czesci.push(item.genres.join(", "));
+      return czesci.join(" · ");
+    }
+
+    function metaHtml(item) {
+      const meta = liniaMeta(item);
+      return meta ? `<div class="title-meta">${esc(meta)}</div>` : "";
+    }
+
+    // GWIAZDKI OCENY (1-10)
+    function pokazGwiazdki(kontener, wybrana, onKlik) {
+      kontener.innerHTML = "";
+      for (let i = 1; i <= 10; i++) {
+        const gw = document.createElement("span");
+        const pelna = i <= wybrana;
+        gw.className = "star" + (pelna ? "" : " off");
+        gw.textContent = pelna ? "★" : "☆";
+        gw.title = i + " / 10";
+        gw.onclick = () => onKlik(i);
+        kontener.appendChild(gw);
+      }
+    }
+
+    function htmlGwiazdek(ocena, id) {
+      let html = "";
+      for (let i = 1; i <= 10; i++) {
+        const pelna = ocena && i <= ocena;
+        html += `<span class="star${pelna ? "" : " off"}" data-id="${id}" data-value="${i}" title="${i} / 10">${pelna ? "★" : "☆"}</span>`;
+      }
+      return html;
+    }
+
+    // Gwiazdki w formularzu dodawania
+    function rysujNowaOcena() {
+      pokazGwiazdki(ratingStars, nowaOcena || 0, (i) => {
+        nowaOcena = (nowaOcena === i) ? null : i;
+        rysujNowaOcena();
+      });
+    }
+    rysujNowaOcena();
+
+    // Gwiazdki na stronie tytułu
+    function rysujOceneSzczegolow() {
+      const item = allItems.find(i => i.id === currentDetailId);
+      if (!item) return;
+      pokazGwiazdki(detailStars, item.rating || 0, (i) => {
+        if (!currentDetailId) return;
+        const aktualny = allItems.find(x => x.id === currentDetailId);
+        updateDoc(doc(db, "watchlist", currentUser.uid, "items", currentDetailId), {
+          rating: (aktualny && aktualny.rating === i) ? null : i
+        });
+      });
+    }
+
+    // PODPOWIEDZI TYTUŁÓW Z BAZY ANIME W FORMULARZU
+    titleInput.oninput = () => {
+      clearTimeout(licznikSzukania);
+      const q = titleInput.value.trim();
+      wybranyAnime = null;
+      if (q.length < 2) {
+        suggestions.classList.add("hidden");
+        return;
+      }
+      licznikSzukania = setTimeout(() => szukajAnime(q), 500);
+    };
+
+    // Tytuł do wyświetlenia - najpierw angielski, potem oryginalny
+    function tytulAnime(r) {
+      return (r.title && (r.title.english || r.title.romaji)) || "Bez tytułu";
+    }
+
+    // Opis z AniList zawiera znaczniki HTML - czyścimy je
+    function czystyOpis(tekst) {
+      if (!tekst) return "";
+      return tekst.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+    }
+
+    async function szukajAnime(q) {
+      try {
+        const resp = await fetch(ANILIST_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({
+            // isAdult: false - filtruje tytuły eksplicytnego charakteru
+            query: `query ($szukane: String) {
+              Page(page: 1, perPage: 7) {
+                media(search: $szukane, type: ANIME, isAdult: false) {
+                  id idMal siteUrl
+                  title { romaji english }
+                  format
+                  startDate { year }
+                  episodes
+                  genres
+                  averageScore
+                  description
+                  coverImage { medium extraLarge }
+                }
+              }
+            }`,
+            variables: { szukane: q }
+          })
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const dane = await resp.json();
+        wynikiAnime = (((dane.data || {}).Page || {}).media) || [];
+
+        if (wynikiAnime.length === 0) {
+          suggestions.classList.add("hidden");
+          return;
+        }
+
+        suggestions.innerHTML = wynikiAnime.map((r, idx) => {
+          const typ = r.format === "MOVIE" ? "film" : "serial";
+          const rok = (r.startDate && r.startDate.year) || "?";
+          return `<div class="suggestion" data-idx="${idx}">${esc(tytulAnime(r))} (${rok}) [${typ}]</div>`;
+        }).join("");
+        suggestions.classList.remove("hidden");
+
+        document.querySelectorAll(".suggestion").forEach(el => {
+          el.onclick = () => {
+            const r = wynikiAnime[Number(el.getAttribute("data-idx"))];
+            wybranyAnime = {
+              malId: r.idMal || null,
+              malUrl: r.idMal ? "https://myanimelist.net/anime/" + r.idMal : (r.siteUrl || null),
+              type: r.format === "MOVIE" ? "movie" : "tv",
+              year: (r.startDate && r.startDate.year) || null,
+              episodes: r.episodes || null,
+              posterPath: (r.coverImage && r.coverImage.medium) || null,
+              posterLarge: (r.coverImage && r.coverImage.extraLarge) || null,
+              overview: czystyOpis(r.description),
+              genres: r.genres || [],
+              score: r.averageScore || null
+            };
+            titleInput.value = tytulAnime(r);
+            typeInput.value = wybranyAnime.type;
+            suggestions.classList.add("hidden");
+          };
+        });
+      } catch (err) {
+        // Limit zapytań / brak internetu - po prostu chowamy podpowiedzi
+        suggestions.classList.add("hidden");
+      }
+    }
+
+    // Zamknięcie podpowiedzi po kliknięciu poza nimi
+    document.onclick = (e) => {
+      if (!e.target.closest(".tytul-wrap")) suggestions.classList.add("hidden");
+    };
 
     // LOGIKA FILTROWANIA I SORTOWANIA
     function przeliczIWyswietl() {
@@ -181,6 +507,10 @@
         result = result.filter(item => !item.watched);
       } else if (filterMode === "watched") {
         result = result.filter(item => item.watched);
+      } else if (filterMode === "movies") {
+        result = result.filter(item => item.type === "movie");
+      } else if (filterMode === "tv") {
+        result = result.filter(item => item.type === "tv");
       } else if (filterMode === "rating_desc") {
         result.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
       } else {
@@ -203,8 +533,12 @@
           <td style="text-align: center;">
             <input type="checkbox" class="toggle-watched" data-id="${item.id}" ${item.watched ? 'checked' : ''}>
           </td>
-          <td>${item.title}</td>
-          <td>${item.rating ? `${item.rating}/10` : '-'}</td>
+          <td>
+            ${item.posterPath ? `<img class="poster" src="${item.posterPath}" alt="" style="height: 60px; margin-right: 8px;">` : ""}
+            <a href="#/film/${item.id}">${esc(item.title)}</a>
+            ${metaHtml(item)}
+          </td>
+          <td>${htmlGwiazdek(item.rating, item.id)}</td>
           <td>
             <button data-id="${item.id}" class="btn-del">Usuń</button>
           </td>
@@ -222,6 +556,18 @@
         };
       });
 
+      // Zmiana oceny gwiazdkami (natychmiastowy update w Firestore)
+      document.querySelectorAll(".star[data-id]").forEach(gw => {
+        gw.onclick = () => {
+          const docId = gw.getAttribute("data-id");
+          const wartosc = Number(gw.getAttribute("data-value"));
+          const item = allItems.find(i => i.id === docId);
+          updateDoc(doc(db, "watchlist", currentUser.uid, "items", docId), {
+            rating: (item && item.rating === wartosc) ? null : wartosc
+          });
+        };
+      });
+
       // Usuwanie
       document.querySelectorAll(".btn-del").forEach(btn => {
         btn.onclick = () => {
@@ -235,19 +581,157 @@
     document.getElementById("addForm").onsubmit = async (e) => {
       e.preventDefault();
       const titleEl = document.getElementById("titleInput");
-      const ratingEl = document.getElementById("ratingInput");
       const watchedEl = document.getElementById("watchedInput");
 
       await addDoc(collection(db, "watchlist", currentUser.uid, "items"), {
         title: titleEl.value.trim(),
-        rating: ratingEl.value ? Number(ratingEl.value) : null,
-        watched: watchedEl.checked
+        type: typeInput.value || (wybranyAnime && wybranyAnime.type) || null,
+        year: (wybranyAnime && wybranyAnime.year) || null,
+        episodes: (wybranyAnime && wybranyAnime.episodes) || null,
+        genres: (wybranyAnime && wybranyAnime.genres) || [],
+        posterPath: (wybranyAnime && wybranyAnime.posterPath) || null,
+        posterLarge: (wybranyAnime && wybranyAnime.posterLarge) || null,
+        malUrl: (wybranyAnime && wybranyAnime.malUrl) || null,
+        malId: (wybranyAnime && wybranyAnime.malId) || null,
+        score: (wybranyAnime && wybranyAnime.score) || null,
+        rating: nowaOcena,
+        watched: watchedEl.checked,
+        description: (wybranyAnime && wybranyAnime.overview) || "",
+        createdAt: serverTimestamp()
       });
 
       titleEl.value = "";
-      ratingEl.value = "";
+      typeInput.value = "";
       watchedEl.checked = false;
+      nowaOcena = null;
+      rysujNowaOcena();
+      wybranyAnime = null;
     };
+
+    // STRONA TYTUŁU - ZMIANA STATUSU
+    detailWatched.onchange = () => {
+      if (!currentDetailId) return;
+      updateDoc(doc(db, "watchlist", currentUser.uid, "items", currentDetailId), {
+        watched: detailWatched.checked
+      });
+    };
+
+    // ZAPIS OPISU
+    document.getElementById("btnSaveDesc").onclick = async () => {
+      if (!currentDetailId) return;
+      saveStatus.textContent = "";
+      try {
+        await updateDoc(doc(db, "watchlist", currentUser.uid, "items", currentDetailId), {
+          description: descInput.value
+        });
+        saveStatus.textContent = "Zapisano ✓";
+        setTimeout(() => { saveStatus.textContent = ""; }, 2000);
+      } catch (err) {
+        saveStatus.textContent = "Błąd zapisu: " + err.message;
+      }
+    };
+
+    // EKSPORT CSV
+    document.getElementById("btnExport").onclick = () => {
+      const naglowki = ["tytul", "typ", "rok", "odcinki", "ocena", "obejrzane", "gatunki", "opis", "plakat", "plakatDuzy", "malUrl", "malId", "ocenaBazy", "dodano"];
+      const wiersze = allItems.map(item => [
+        item.title || "",
+        item.type || "",
+        item.year || "",
+        item.episodes ?? "",
+        item.rating ?? "",
+        item.watched ? "tak" : "nie",
+        (item.genres || []).join("|"),
+        item.description || "",
+        item.posterPath || "",
+        item.posterLarge || "",
+        item.malUrl || "",
+        item.malId ?? "",
+        item.score ?? "",
+        item.createdAt && item.createdAt.toMillis ? new Date(item.createdAt.toMillis()).toISOString() : ""
+      ]);
+      const csv = [naglowki, ...wiersze].map(w => w.map(poleCsv).join(",")).join("\r\n");
+
+      // BOM na początku, żeby Excel poprawnie otworzył polskie znaki
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "watchlista.csv";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    };
+
+    function poleCsv(wartosc) {
+      const tekst = String(wartosc ?? "");
+      return /[",\r\n]/.test(tekst) ? `"${tekst.replace(/"/g, '""')}"` : tekst;
+    }
+
+    // IMPORT CSV
+    document.getElementById("btnImport").onclick = () => csvFile.click();
+
+    csvFile.onchange = async () => {
+      const plik = csvFile.files[0];
+      if (!plik) return;
+      const tekst = await plik.text();
+      const pozycje = parsujCSV(tekst).slice(1); // pierwsza linia to nagłówki
+      if (pozycje.length === 0) {
+        csvFile.value = "";
+        return;
+      }
+      if (!confirm(`Zaimportować ${pozycje.length} pozycji z pliku?`)) {
+        csvFile.value = "";
+        return;
+      }
+
+      for (const w of pozycje) {
+        if (!(w[0] || "").trim()) continue;
+        await addDoc(collection(db, "watchlist", currentUser.uid, "items"), {
+          title: w[0].trim(),
+          type: w[1] || null,
+          year: w[2] ? Number(w[2]) : null,
+          episodes: w[3] ? Number(w[3]) : null,
+          rating: w[4] ? Number(w[4]) : null,
+          watched: w[5] === "tak",
+          genres: w[6] ? w[6].split("|") : [],
+          description: w[7] || "",
+          posterPath: w[8] || null,
+          posterLarge: w[9] || null,
+          malUrl: w[10] || null,
+          malId: w[11] ? Number(w[11]) : null,
+          score: w[12] ? Number(w[12]) : null,
+          createdAt: (w[13] && !isNaN(Date.parse(w[13]))) ? Timestamp.fromDate(new Date(w[13])) : serverTimestamp()
+        });
+      }
+      csvFile.value = "";
+    };
+
+    // PROSTY PARSER CSV (obsługuje cudzysłowy i przecinki wewnątrz pól)
+    function parsujCSV(tekst) {
+      const wiersze = [[]];
+      let pole = "";
+      let wCudzyslowie = false;
+      for (let i = 0; i < tekst.length; i++) {
+        const znak = tekst[i];
+        if (wCudzyslowie) {
+          if (znak === '"' && tekst[i + 1] === '"') { pole += '"'; i++; }
+          else if (znak === '"') wCudzyslowie = false;
+          else pole += znak;
+        } else if (znak === '"') {
+          wCudzyslowie = true;
+        } else if (znak === ",") {
+          wiersze[wiersze.length - 1].push(pole);
+          pole = "";
+        } else if (znak === "\n") {
+          wiersze[wiersze.length - 1].push(pole);
+          pole = "";
+          wiersze.push([]);
+        } else if (znak !== "\r") {
+          pole += znak;
+        }
+      }
+      wiersze[wiersze.length - 1].push(pole);
+      return wiersze.filter(w => w.length > 1 || (w[0] || "").trim() !== "");
+    }
 
     // EVENTY WYSZUKIWARKI I FILTRA
     searchInput.oninput = przeliczIWyswietl;
