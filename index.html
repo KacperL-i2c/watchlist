@@ -124,8 +124,28 @@
     <a href="#/" class="back-link">&larr; Wróć do listy</a>
     <div class="detail-box">
       <img id="detailPoster" class="poster hidden" alt="" style="float: right; max-width: 180px; margin: 0 0 10px 15px;">
-      <h2 id="detailTitle" style="margin-top: 0;"></h2>
-      <div id="detailMetaLine" class="title-meta"></div>
+
+      <p style="margin-top: 0;">
+        Tytuł:<br>
+        <input type="text" id="detailTitle" style="width: 100%; box-sizing: border-box;">
+      </p>
+
+      <p>
+        Typ:
+        <select id="detailType">
+          <option value="">-</option>
+          <option value="movie">Film</option>
+          <option value="tv">Serial</option>
+        </select>
+
+        Rok: <input type="number" id="detailYear" style="width: 80px;">
+        Odcinki: <input type="number" id="detailEpisodes" style="width: 80px;">
+      </p>
+
+      <p>
+        Gatunki:<br>
+        <input type="text" id="detailGenres" placeholder="np. Akcja, Przygodowa" style="width: 100%; box-sizing: border-box;">
+      </p>
 
       <p>
         <label style="margin: 0 8px;">
@@ -134,6 +154,15 @@
 
         Ocena: <span id="detailStars" class="stars-box"></span>
       </p>
+
+      <button id="btnSaveMeta">Zapisz zmiany</button>
+      <span id="metaStatus" class="saved-status"></span>
+
+      <h3>Zdjęcie</h3>
+      <input type="file" id="photoFile" accept="image/*" class="hidden">
+      <button id="btnPhoto">Wybierz zdjęcie</button>
+      <button id="btnPhotoDel">Usuń zdjęcie</button>
+      <span id="photoStatus" class="saved-status"></span>
 
       <h3>Opis</h3>
       <textarea id="descInput" rows="7" placeholder="Twój opis, przemyślenia, notatki..."></textarea><br>
@@ -203,9 +232,15 @@
     const detailSec = document.getElementById("detail-section");
     const detailPoster = document.getElementById("detailPoster");
     const detailTitle = document.getElementById("detailTitle");
-    const detailMetaLine = document.getElementById("detailMetaLine");
+    const detailType = document.getElementById("detailType");
+    const detailYear = document.getElementById("detailYear");
+    const detailEpisodes = document.getElementById("detailEpisodes");
+    const detailGenres = document.getElementById("detailGenres");
     const detailWatched = document.getElementById("detailWatched");
     const detailStars = document.getElementById("detailStars");
+    const metaStatus = document.getElementById("metaStatus");
+    const photoFile = document.getElementById("photoFile");
+    const photoStatus = document.getElementById("photoStatus");
     const descInput = document.getElementById("descInput");
     const saveStatus = document.getElementById("saveStatus");
     const detailMeta = document.getElementById("detailMeta");
@@ -297,12 +332,10 @@
       appSec.classList.add("hidden");
       detailSec.classList.remove("hidden");
 
-      detailTitle.textContent = item.title;
-      detailMetaLine.textContent = liniaMeta(item);
-      detailMetaLine.classList.toggle("hidden", !liniaMeta(item));
-
-      if (item.posterPath) {
-        detailPoster.src = item.posterLarge || item.posterPath;
+      // Podgląd zdjęcia: własne zdjęcie ma pierwszeństwo przed plakatem z bazy
+      const obraz = item.photo || item.posterLarge || item.posterPath;
+      if (obraz) {
+        detailPoster.src = obraz;
         detailPoster.classList.remove("hidden");
       } else {
         detailPoster.classList.add("hidden");
@@ -318,13 +351,16 @@
         detailMal.classList.add("hidden");
       }
 
+      // Wypełniamy formularz danymi (nie nadpisujemy pola, gdy użytkownik właśnie w nim pisze)
+      wstawWartosc(detailTitle, item.title || "");
+      wstawWartosc(detailType, item.type || "");
+      wstawWartosc(detailYear, item.year || "");
+      wstawWartosc(detailEpisodes, item.episodes || "");
+      wstawWartosc(detailGenres, (item.genres || []).join(", "));
       detailWatched.checked = !!item.watched;
       rysujOceneSzczegolow();
 
-      // Nie nadpisujemy pola, gdy użytkownik właśnie w nim pisze
-      if (document.activeElement !== descInput) {
-        descInput.value = item.description || "";
-      }
+      wstawWartosc(descInput, item.description || "");
 
       detailMeta.textContent = (item.score ? "Ocena bazy: " + item.score + " / 100 · " : "") +
         "Dodano: " + (item.createdAt && item.createdAt.toMillis
@@ -352,6 +388,16 @@
     function metaHtml(item) {
       const meta = liniaMeta(item);
       return meta ? `<div class="title-meta">${esc(meta)}</div>` : "";
+    }
+
+    // Wstawia wartość do pola, chyba że użytkownik właśnie je edytuje
+    function wstawWartosc(pole, wartosc) {
+      if (document.activeElement !== pole) pole.value = wartosc;
+    }
+
+    // Zdjęcie do pokazania w tabeli: własne zdjęcie ma pierwszeństwo przed plakatem z bazy
+    function obrazek(item) {
+      return item.photo || item.posterPath || null;
     }
 
     // GWIAZDKI OCENY (1-10)
@@ -534,7 +580,7 @@
             <input type="checkbox" class="toggle-watched" data-id="${item.id}" ${item.watched ? 'checked' : ''}>
           </td>
           <td>
-            ${item.posterPath ? `<img class="poster" src="${item.posterPath}" alt="" style="height: 60px; margin-right: 8px;">` : ""}
+            ${obrazek(item) ? `<img class="poster" src="${obrazek(item)}" alt="" style="height: 60px; margin-right: 8px;">` : ""}
             <a href="#/film/${item.id}">${esc(item.title)}</a>
             ${metaHtml(item)}
           </td>
@@ -630,6 +676,75 @@
         saveStatus.textContent = "Błąd zapisu: " + err.message;
       }
     };
+
+    // STRONA TYTUŁU - ZAPIS PODSTAWOWYCH DANYCH
+    document.getElementById("btnSaveMeta").onclick = async () => {
+      if (!currentDetailId) return;
+      metaStatus.textContent = "";
+      const tytul = detailTitle.value.trim();
+      if (!tytul) {
+        metaStatus.textContent = "Tytuł nie może być pusty";
+        return;
+      }
+      try {
+        await updateDoc(doc(db, "watchlist", currentUser.uid, "items", currentDetailId), {
+          title: tytul,
+          type: detailType.value || null,
+          year: detailYear.value ? Number(detailYear.value) : null,
+          episodes: detailEpisodes.value ? Number(detailEpisodes.value) : null,
+          genres: detailGenres.value.trim()
+            ? detailGenres.value.split(",").map(g => g.trim()).filter(Boolean)
+            : []
+        });
+        metaStatus.textContent = "Zapisano ✓";
+        setTimeout(() => { metaStatus.textContent = ""; }, 2000);
+      } catch (err) {
+        metaStatus.textContent = "Błąd zapisu: " + err.message;
+      }
+    };
+
+    // STRONA TYTUŁU - WŁASNE ZDJĘCIE
+    document.getElementById("btnPhoto").onclick = () => photoFile.click();
+
+    document.getElementById("btnPhotoDel").onclick = () => {
+      if (!currentDetailId) return;
+      updateDoc(doc(db, "watchlist", currentUser.uid, "items", currentDetailId), { photo: null });
+      photoStatus.textContent = "";
+    };
+
+    photoFile.onchange = () => {
+      const plik = photoFile.files[0];
+      if (!plik || !currentDetailId) return;
+      const czytnik = new FileReader();
+      czytnik.onload = () => zapiszZdjecie(czytnik.result);
+      czytnik.readAsDataURL(plik);
+      photoFile.value = "";
+    };
+
+    // Zmniejszamy zdjęcie przed zapisem, żeby spokojnie zmieścić się w limicie dokumentu Firestore (1 MB)
+    function zapiszZdjecie(daneWejsciowe) {
+      const img = new Image();
+      img.onload = () => {
+        const maksBok = 480;
+        const skala = Math.min(1, maksBok / Math.max(img.width, img.height));
+        const plotno = document.createElement("canvas");
+        plotno.width = Math.round(img.width * skala);
+        plotno.height = Math.round(img.height * skala);
+        plotno.getContext("2d").drawImage(img, 0, 0, plotno.width, plotno.height);
+        updateDoc(doc(db, "watchlist", currentUser.uid, "items", currentDetailId), {
+          photo: plotno.toDataURL("image/jpeg", 0.8)
+        }).then(() => {
+          photoStatus.textContent = "Zapisano ✓";
+          setTimeout(() => { photoStatus.textContent = ""; }, 2000);
+        }).catch(err => {
+          photoStatus.textContent = "Błąd zapisu: " + err.message;
+        });
+      };
+      img.onerror = () => {
+        photoStatus.textContent = "To nie jest prawidłowy plik graficzny";
+      };
+      img.src = daneWejsciowe;
+    }
 
     // EKSPORT CSV
     document.getElementById("btnExport").onclick = () => {
